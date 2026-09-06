@@ -1,0 +1,9 @@
+name: portable-core
+on: [push, pull_request]
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile x86_64, AArch64 and RISC-V64 cores
+        run: make check-all
