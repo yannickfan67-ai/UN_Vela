@@ -3,12 +3,12 @@
 #include "vela.h"
 
 #define VELA_HISTORY_MAX 8
-#define VELA_URL_CAP 160
+#define VELA_URL_CAP 192
 
 static AsterDocument g_doc;
 static char g_raw[32768];
 static char g_url[VELA_URL_CAP];
-static char g_status[96];
+static char g_status[128];
 static char g_history[VELA_HISTORY_MAX][VELA_URL_CAP];
 static int g_url_len;
 static int g_viewport=720;
@@ -23,18 +23,49 @@ static void bytes_zero(void *p,size_t n){uint8_t*b=(uint8_t*)p;while(n--)*b++=0;
 static void bytes_copy(void*d,const void*s,size_t n){uint8_t*dd=(uint8_t*)d;const uint8_t*ss=(const uint8_t*)s;while(n--)*dd++=*ss++;}
 static void copy(char*d,size_t cap,const char*s){size_t i=0;if(!cap)return;while(s&&s[i]&&i+1<cap){d[i]=s[i];i++;}d[i]=0;}
 static void append(char*d,size_t cap,const char*s){size_t i=0;while(i<cap&&d[i])i++;while(s&&*s&&i+1<cap)d[i++]=*s++;if(i<cap)d[i]=0;}
+static char lower_ascii(char c){return c>='A'&&c<='Z'?(char)(c+('a'-'A')):c;}
+static int starts_ci(const char*s,const char*p){if(!s||!p)return 0;while(*p){if(!*s||lower_ascii(*s++)!=lower_ascii(*p++))return 0;}return 1;}
 static void set_url(const char*s){copy(g_url,sizeof(g_url),s?s:"");g_url_len=0;while(g_url[g_url_len]&&g_url_len<(int)sizeof(g_url)-1)g_url_len++;}
 static void request_repaint(void){
     if(g_platform_ready&&(g_platform.capabilities&VELA_PLATFORM_CAP_REPAINT)&&g_platform.request_repaint)
         g_platform.request_repaint(g_platform_context);
+}
+static void platform_log(uint32_t level,const char*message){
+    if(g_platform_ready&&(g_platform.capabilities&VELA_PLATFORM_CAP_LOG)&&g_platform.log)
+        g_platform.log(g_platform_context,level,message);
 }
 static void parse_current(void){
     aster_parse_html(&g_doc,g_raw);
     aster_layout(&g_doc,g_viewport>40?g_viewport-40:g_viewport);
     g_scroll=0;
 }
+static int canonicalize_url(const char*url,char*out,size_t cap){
+    if(!url||!out||cap<9)return 0;
+    while(*url==' '||*url=='\t')url++;
+    if(!*url){copy(g_status,sizeof(g_status),"Enter an HTTP address");return 0;}
+    if(starts_ci(url,"https://")){
+        if(!(g_platform_ready&&(g_platform.capabilities&VELA_PLATFORM_CAP_TLS))){
+            copy(g_status,sizeof(g_status),"HTTPS requires a TLS-capable host");
+            return 0;
+        }
+        copy(out,cap,url);return 1;
+    }
+    if(starts_ci(url,"http://")){copy(out,cap,url);return 1;}
+    if(starts_ci(url,"file:")||starts_ci(url,"javascript:")||starts_ci(url,"data:")||starts_ci(url,"mailto:")){
+        copy(g_status,sizeof(g_status),"Unsupported URL scheme");return 0;
+    }
+    copy(out,cap,"http://");append(out,cap,url);return 1;
+}
 static void start_page(void){
-    copy(g_raw,sizeof(g_raw),"<html><head><title>UN_Vela</title></head><body><h1>UN_Vela</h1><p>Portable browser shell powered by Aster Engine.</p><h2>Compatibility</h2><p>The browser core is OS and CPU architecture independent. The host supplies network, windowing and other services through Vela Platform ABI 1.</p><p>UN_Orion is one host; hosted Windows, Linux, macOS and other ports can use the same shell.</p></body></html>");
+    copy(g_raw,sizeof(g_raw),
+        "<html><head><title>UN_Vela</title></head><body>"
+        "<header><h1>UN_Vela</h1><p>Portable browser shell powered by Aster Engine.</p></header>"
+        "<main><section><h2>Compatibility</h2>"
+        "<p>The browser core is OS and CPU architecture independent. The host supplies network, windowing and other services through Vela Platform ABI 1.</p>"
+        "<p>UN_Orion is one host; hosted Windows, Linux, macOS and other ports can use the same shell.</p>"
+        "<h3>Carrier capabilities</h3><p>HTTP is a host capability. HTTPS is accepted only when the host advertises TLS support.</p>"
+        "</section></main><footer><p>History, scrolling and local HTML remain browser-core features.</p></footer>"
+        "</body></html>");
     parse_current();
 }
 static void history_push(const char *url){
@@ -56,19 +87,22 @@ static void history_push(const char *url){
     }
 }
 static int navigate(const char *url,int push){
+    char normalized[VELA_URL_CAP];
     if(!url||!*url){copy(g_status,sizeof(g_status),"Enter an HTTP address");return 0;}
     if(!g_platform_ready||!(g_platform.capabilities&VELA_PLATFORM_CAP_HTTP)||!g_platform.http_get){
         copy(g_status,sizeof(g_status),"No HTTP backend installed");
         return 0;
     }
+    if(!canonicalize_url(url,normalized,sizeof(normalized)))return 0;
     copy(g_status,sizeof(g_status),"Loading...");
     request_repaint();
-    if(!g_platform.http_get(g_platform_context,url,g_raw,sizeof(g_raw),g_status,sizeof(g_status)))return 0;
-    set_url(url);
+    platform_log(1,"loading document");
+    if(!g_platform.http_get(g_platform_context,normalized,g_raw,sizeof(g_raw),g_status,sizeof(g_status)))return 0;
+    set_url(normalized);
     parse_current();
-    if(push)history_push(url);
+    if(push)history_push(normalized);
     if(g_doc.title[0]){
-        char s[96];
+        char s[128];
         copy(s,sizeof(s),g_status);
         copy(g_status,sizeof(g_status),g_doc.title);
         append(g_status,sizeof(g_status)," / ");
@@ -149,7 +183,7 @@ int vela_forward(void){
 }
 int vela_reload(void){if(!g_url[0])return 0;return navigate(g_url,0);}
 void vela_set_scroll(int y){
-    int max=g_doc.document_height>0?g_doc.document_height-1:0;
+    int max=aster_document_height(&g_doc)>0?aster_document_height(&g_doc)-1:0;
     if(y<0)y=0;
     if(y>max)y=max;
     g_scroll=y;
