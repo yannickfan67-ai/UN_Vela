@@ -6,9 +6,9 @@
 #include "aster.h"
 
 #define VELA_NAME "UN_Vela"
-#define VELA_VERSION "0.3.1-dev"
+#define VELA_VERSION "0.3.2-dev"
 #define VELA_API_MAJOR 1u
-#define VELA_API_MINOR 3u
+#define VELA_API_MINOR 4u
 #define VELA_API_VERSION ((VELA_API_MAJOR << 16) | VELA_API_MINOR)
 #define VELA_CAP_PLATFORM_ABI    (1ull << 0)
 #define VELA_CAP_HISTORY         (1ull << 1)
@@ -19,9 +19,22 @@
 #define VELA_CAP_JS_SUBSET       (1ull << 6)
 #define VELA_CAP_FEATURE_PROFILE (1ull << 7)
 #define VELA_CAP_RESOURCES       (1ull << 8)
+#define VELA_CAP_NAV_ACTIONS     (1ull << 9)
 #define VELA_FEATURE_JAVASCRIPT  (1u << 0)
 #define VELA_PROFILE_LITE 0u
 #define VELA_PROFILE_FULL VELA_FEATURE_JAVASCRIPT
+
+typedef enum VelaNavAction {
+    VELA_NAV_BACK=1,
+    VELA_NAV_FORWARD,
+    VELA_NAV_RELOAD,
+    VELA_NAV_LINE_UP,
+    VELA_NAV_LINE_DOWN,
+    VELA_NAV_PAGE_UP,
+    VELA_NAV_PAGE_DOWN,
+    VELA_NAV_HOME,
+    VELA_NAV_END
+} VelaNavAction;
 
 void vela_init(int viewport_width);
 int vela_init_ex(int viewport_width,const VelaPlatformOps *platform,void *platform_context);
@@ -43,6 +56,7 @@ int vela_forward(void);
 int vela_reload(void);
 int vela_can_back(void);
 int vela_can_forward(void);
+int vela_navigate_action(VelaNavAction action);
 int vela_activate_link(int x,int y);
 int vela_resource_get(const char *ref,uint8_t *data,size_t data_cap,size_t *data_len,char *content_type,size_t content_type_cap,char *status,size_t status_cap);
 void vela_set_scroll(int scroll_y);
