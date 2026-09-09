@@ -30,3 +30,5 @@ The CSS and JavaScript implementations are deliberately compact subsets and are 
 - Aster Engine 0.3.0
 - Vela API 1.2
 - Vela Platform ABI 1.1
+
+Release channel: stable.
