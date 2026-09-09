@@ -1,5 +1,6 @@
 #ifndef UN_VELA_H
 #define UN_VELA_H
+#include <stddef.h>
 #include <stdint.h>
 #include "vela_platform.h"
 #include "aster.h"
@@ -17,6 +18,7 @@
 #define VELA_CAP_LINK_ACTIVATION (1ull << 5)
 #define VELA_CAP_JS_SUBSET       (1ull << 6)
 #define VELA_CAP_FEATURE_PROFILE (1ull << 7)
+#define VELA_CAP_RESOURCES       (1ull << 8)
 #define VELA_FEATURE_JAVASCRIPT  (1u << 0)
 #define VELA_PROFILE_LITE 0u
 #define VELA_PROFILE_FULL VELA_FEATURE_JAVASCRIPT
@@ -42,6 +44,7 @@ int vela_reload(void);
 int vela_can_back(void);
 int vela_can_forward(void);
 int vela_activate_link(int x,int y);
+int vela_resource_get(const char *ref,uint8_t *data,size_t data_cap,size_t *data_len,char *content_type,size_t content_type_cap,char *status,size_t status_cap);
 void vela_set_scroll(int scroll_y);
 void vela_scroll_by(int delta_y);
 int vela_scroll(void);
