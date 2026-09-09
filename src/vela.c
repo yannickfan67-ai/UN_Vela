@@ -41,7 +41,7 @@ static int navigate(const char*url,int push){return navigate_depth(url,push,0);}
 static void start_page(void){copy(g_raw,sizeof(g_raw),"<html><head><title>UN_Vela</title><style>h2{color:#315e80} a{font-weight:bold}</style></head><body><header><h1>UN_Vela 0.3</h1><p>Portable browser shell powered by Aster Engine.</p></header><main><h2>Runtime</h2><p>HTTP/HTTPS carrier, CSS subset, image elements, history, links, scrolling and a safe JavaScript subset are available by capability.</p></main></body></html>");parse_current();}
 int vela_set_platform(const VelaPlatformOps*platform,void*context){bytes_zero(&g_platform,sizeof(g_platform));g_platform_context=context;g_platform_ready=0;if(!platform)return 1;if(!vela_platform_is_compatible(platform))return 0;size_t n=platform->struct_size<sizeof(g_platform)?platform->struct_size:sizeof(g_platform);bytes_copy(&g_platform,platform,n);g_platform_ready=1;return 1;}
 uint32_t vela_api_version(void){return VELA_API_VERSION;}
-uint64_t vela_capabilities(void){return VELA_CAP_PLATFORM_ABI|VELA_CAP_HISTORY|VELA_CAP_SCROLL|VELA_CAP_LOCAL_HTML|VELA_CAP_ASTER_DOC|VELA_CAP_LINK_ACTIVATION|VELA_CAP_JS_SUBSET|VELA_CAP_FEATURE_PROFILE|VELA_CAP_RESOURCES;}
+uint64_t vela_capabilities(void){return VELA_CAP_PLATFORM_ABI|VELA_CAP_HISTORY|VELA_CAP_SCROLL|VELA_CAP_LOCAL_HTML|VELA_CAP_ASTER_DOC|VELA_CAP_LINK_ACTIVATION|VELA_CAP_JS_SUBSET|VELA_CAP_FEATURE_PROFILE|VELA_CAP_RESOURCES|VELA_CAP_NAV_ACTIONS;}
 uint64_t vela_platform_capabilities(void){return g_platform_ready?g_platform.capabilities:0;}
 void vela_set_features(uint32_t f){g_features=f;request_repaint();}
 uint32_t vela_features(void){return g_features;}
@@ -59,6 +59,22 @@ int vela_can_forward(void){return g_history_index>=0&&g_history_index+1<g_histor
 int vela_back(void){if(!vela_can_back())return 0;int target=g_history_index-1;char u[VELA_URL_CAP];copy(u,sizeof(u),g_history[target]);if(!navigate(u,0))return 0;g_history_index=target;return 1;}
 int vela_forward(void){if(!vela_can_forward())return 0;int target=g_history_index+1;char u[VELA_URL_CAP];copy(u,sizeof(u),g_history[target]);if(!navigate(u,0))return 0;g_history_index=target;return 1;}
 int vela_reload(void){if(!g_url[0])return 0;return navigate(g_url,0);}
+int vela_navigate_action(VelaNavAction action){
+    int before=g_scroll;
+    int page=g_viewport_h>96?g_viewport_h-48:48;
+    switch(action){
+        case VELA_NAV_BACK:return vela_back();
+        case VELA_NAV_FORWARD:return vela_forward();
+        case VELA_NAV_RELOAD:return vela_reload();
+        case VELA_NAV_LINE_UP:vela_scroll_by(-48);return g_scroll!=before;
+        case VELA_NAV_LINE_DOWN:vela_scroll_by(48);return g_scroll!=before;
+        case VELA_NAV_PAGE_UP:vela_scroll_by(-page);return g_scroll!=before;
+        case VELA_NAV_PAGE_DOWN:vela_scroll_by(page);return g_scroll!=before;
+        case VELA_NAV_HOME:vela_set_scroll(0);return g_scroll!=before;
+        case VELA_NAV_END:vela_set_scroll(aster_document_height(&g_doc));return g_scroll!=before;
+        default:return 0;
+    }
+}
 int vela_activate_link(int x,int y){char href[VELA_URL_CAP];if(!aster_link_at(&g_doc,x,y,g_scroll,href,sizeof(href)))return 0;if(starts_ci(href,"javascript:")){if(!(g_features&VELA_FEATURE_JAVASCRIPT)){copy(g_status,sizeof(g_status),"JavaScript disabled by profile");return 0;}char script[VELA_JS_TEXT_CAP];copy(script,sizeof(script),href+11);char tmp[256];if(js_call_value(script,"console.log",tmp,sizeof(tmp)))platform_log(1,tmp);if(js_assign_value(script,"location.href",tmp,sizeof(tmp))){char u[VELA_URL_CAP];if(resolve_url(g_url,tmp,u,sizeof(u)))return navigate(u,1);}copy(g_status,sizeof(g_status),"JavaScript link executed");request_repaint();return 1;}char target[VELA_URL_CAP];if(!resolve_url(g_url,href,target,sizeof(target)))return 0;return navigate(target,1);}
 int vela_resource_get(const char*ref,uint8_t*data,size_t data_cap,size_t*data_len,char*content_type,size_t content_type_cap,char*status,size_t status_cap){if(data_len)*data_len=0;if(content_type&&content_type_cap)content_type[0]=0;if(status&&status_cap)status[0]=0;if(!ref||!*ref||!data||!data_cap)return 0;if(!g_platform_ready||!(g_platform.capabilities&VELA_PLATFORM_CAP_RESOURCES)||!g_platform.resource_get){if(status&&status_cap)copy(status,status_cap,"No resource backend installed");return 0;}char target[VELA_URL_CAP];if(!resolve_url(g_url,ref,target,sizeof(target))||starts_ci(target,"javascript:")){if(status&&status_cap)copy(status,status_cap,"Unsupported resource URL");return 0;}return g_platform.resource_get(g_platform_context,target,data,data_cap,data_len,content_type,content_type_cap,status,status_cap);}
 void vela_set_scroll(int y){int max=aster_document_height(&g_doc)-g_viewport_h+24;if(max<0)max=0;if(y<0)y=0;if(y>max)y=max;g_scroll=y;request_repaint();}

@@ -2,7 +2,7 @@
 
 UN_Vela is the primary browser shell for UN_Orion and a portable hosted browser core for conventional desktop operating systems.
 
-Current development line: **0.3.1-dev**.  
+Current development line: **0.3.2-dev**.  
 Rendering engine ABI: **Aster Engine 0.3.1 / API 1.3**.
 
 UN_Vela owns browser-shell behavior: URL input, navigation state, page title/status, history, scrolling, viewport state, feature profiles and the host-service boundary. HTML parsing/layout/painting belongs to Aster Engine.
@@ -22,12 +22,15 @@ The 0.3.x line includes:
 
 - markup-preserving HTML navigation
 - Back / Forward / Reload and scroll APIs
+- portable navigation actions for Back, Forward, Reload, line/page scrolling, Home and End
 - relative/root/scheme-relative URL resolution
 - Full and Lite feature profiles
 - a controlled JavaScript subset in Full mode
 - binary resource loading for images
 - Aster lightweight CSS and image layout
 - simple CSS selectors in Aster 0.3.1: `*`, tag, `.class`, `#id`, `tag.class`, `tag#id`, and comma-separated simple selector lists
+
+`vela_navigate_action()` is deliberately input-device neutral. Native shells can map keyboard, mouse, touch, controller or accessibility commands onto one browser action ABI instead of duplicating scroll/history policy in every host.
 
 Aster remains intentionally lightweight. Descendant, child, attribute and pseudo selectors are not yet implemented.
 
@@ -63,6 +66,8 @@ Two compatibility layers are tested:
 1. `portable-core` compiles the core for x86_64, AArch64 and RISC-V64.
 2. `hosted-os` configures, builds and runs a hosted carrier smoke test on Ubuntu, macOS and Windows.
 
+The core smoke also validates JavaScript/profile behavior, link/resource resolution and the portable navigation-action contract.
+
 ## Build hosted carrier
 
 ```bash
@@ -79,6 +84,7 @@ ctest --test-dir build-hosted -C Release --output-on-failure
 - `src/vela.c` — portable browser-shell core
 - `host/vela_host_posix.c` — Linux/macOS libcurl carrier
 - `host/vela_host_win32.c` — Windows WinHTTP carrier
+- `tests/core_smoke.c` — core/profile/navigation regression smoke
 - `tests/host_smoke.c` — hosted ABI/runtime smoke test
 - `vendor/aster/include/aster.h` — synchronized Aster public ABI
 

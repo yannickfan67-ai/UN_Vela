@@ -28,6 +28,12 @@ int main(void){
     vela_set_features(VELA_PROFILE_LITE);
     if(!vela_load_html("<html><head><title>Parsed</title></head><body><script>document.title='Should Not Run';</script></body></html>","https://lite.test/"))return 7;
     if(strcmp(vela_title(),"Parsed")!=0)return 8;
-    vela_set_scroll(999);if(vela_scroll()!=284)return 9;
-    puts("UN_Vela core JS/profile/link/resource smoke passed");return 0;
+    if(!(vela_capabilities()&VELA_CAP_NAV_ACTIONS))return 9;
+    vela_set_scroll(999);if(vela_scroll()!=284)return 10;
+    if(!vela_navigate_action(VELA_NAV_HOME)||vela_scroll()!=0)return 11;
+    if(!vela_navigate_action(VELA_NAV_END)||vela_scroll()!=284)return 12;
+    if(!vela_navigate_action(VELA_NAV_PAGE_UP)||vela_scroll()!=92)return 13;
+    if(!vela_navigate_action(VELA_NAV_LINE_DOWN)||vela_scroll()!=140)return 14;
+    if(vela_navigate_action((VelaNavAction)999))return 15;
+    puts("UN_Vela core JS/profile/link/resource/navigation smoke passed");return 0;
 }
