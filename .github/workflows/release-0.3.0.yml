@@ -1,0 +1,27 @@
+name: release-0.3.0
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: ${{ contains(github.event.head_commit.message, '[release-v0.3.0]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish UN_Vela 0.3.0
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.3.0 >/dev/null 2>&1; then
+            echo "v0.3.0 already exists; leaving it unchanged"
+            exit 0
+          fi
+          gh release create v0.3.0 \
+            --target "$GITHUB_SHA" \
+            --title "UN_Vela 0.3.0" \
+            --notes-file RELEASE_NOTES_0.3.0.md
