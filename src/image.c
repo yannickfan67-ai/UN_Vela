@@ -5,22 +5,8 @@ static uint32_t le32(const uint8_t*p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|
 static int32_t les32(const uint8_t*p){return (int32_t)le32(p);}
 static int space(uint8_t c){return c==' '||c=='\t'||c=='\r'||c=='\n';}
 static int digit(uint8_t c){return c>='0'&&c<='9';}
-static int ppm_num(const uint8_t*d,size_t n,size_t*pos,uint32_t*out){
-    while(*pos<n){while(*pos<n&&space(d[*pos]))(*pos)++;if(*pos<n&&d[*pos]=='#'){while(*pos<n&&d[*pos]!='\n')(*pos)++;continue;}break;}
-    if(*pos>=n||!digit(d[*pos]))return 0;uint32_t v=0;while(*pos<n&&digit(d[*pos])){if(v>1000000u)return 0;v=v*10u+(uint32_t)(d[(*pos)++]-'0');}*out=v;return 1;
-}
-static int probe_bmp(const uint8_t*d,size_t n,VelaImageInfo*i){
-    if(n<54||d[0]!='B'||d[1]!='M')return 0;uint32_t dib=le32(d+14);if(dib<40)return 0;int32_t w=les32(d+18),h=les32(d+22);uint16_t planes=le16(d+26),bpp=le16(d+28);uint32_t compression=le32(d+30);if(w<=0||h==0||planes!=1||(bpp!=24&&bpp!=32)||compression!=0)return 0;uint32_t ah=(uint32_t)(h<0?-h:h);if((uint32_t)w>8192||ah>8192)return 0;if(i){i->width=(uint32_t)w;i->height=ah;i->channels=3;}return 1;
-}
-static int probe_ppm(const uint8_t*d,size_t n,VelaImageInfo*i,size_t*payload){
-    if(n<3||d[0]!='P'||d[1]!='6'||!space(d[2]))return 0;size_t p=2;uint32_t w,h,max;if(!ppm_num(d,n,&p,&w)||!ppm_num(d,n,&p,&h)||!ppm_num(d,n,&p,&max))return 0;if(!w||!h||w>8192||h>8192||max!=255)return 0;if(p>=n||!space(d[p]))return 0;while(p<n&&space(d[p]))p++;size_t need=(size_t)w*(size_t)h*3u;if(need/3u!=(size_t)w*(size_t)h||p>n||need>n-p)return 0;if(i){i->width=w;i->height=h;i->channels=3;}if(payload)*payload=p;return 1;
-}
+static int ppm_num(const uint8_t*d,size_t n,size_t*pos,uint32_t*out){while(*pos<n){while(*pos<n&&space(d[*pos]))(*pos)++;if(*pos<n&&d[*pos]=='#'){while(*pos<n&&d[*pos]!='\n')(*pos)++;continue;}break;}if(*pos>=n||!digit(d[*pos]))return 0;uint32_t v=0;while(*pos<n&&digit(d[*pos])){if(v>1000000u)return 0;v=v*10u+(uint32_t)(d[(*pos)++]-'0');}*out=v;return 1;}
+static int probe_bmp(const uint8_t*d,size_t n,VelaImageInfo*i){if(n<54||d[0]!='B'||d[1]!='M')return 0;uint32_t dib=le32(d+14);if(dib<40)return 0;int32_t w=les32(d+18),h=les32(d+22);uint16_t planes=le16(d+26),bpp=le16(d+28);uint32_t compression=le32(d+30);if(w<=0||h==0||planes!=1||(bpp!=24&&bpp!=32)||compression!=0)return 0;uint32_t ah=(uint32_t)(h<0?-h:h);if((uint32_t)w>8192||ah>8192)return 0;if(i){i->width=(uint32_t)w;i->height=ah;i->channels=3;}return 1;}
+static int probe_ppm(const uint8_t*d,size_t n,VelaImageInfo*i,size_t*payload){if(n<3||d[0]!='P'||d[1]!='6'||!space(d[2]))return 0;size_t p=2;uint32_t w,h,max;if(!ppm_num(d,n,&p,&w)||!ppm_num(d,n,&p,&h)||!ppm_num(d,n,&p,&max))return 0;if(!w||!h||w>8192||h>8192||max!=255)return 0;if(p>=n||!space(d[p]))return 0;if(d[p]=='\r'&&p+1<n&&d[p+1]=='\n')p+=2;else p++;size_t pixels=(size_t)w*(size_t)h;if(w&&pixels/(size_t)w!=(size_t)h)return 0;size_t need=pixels*3u;if(pixels&&need/3u!=pixels)return 0;if(p>n||need>n-p)return 0;if(i){i->width=w;i->height=h;i->channels=3;}if(payload)*payload=p;return 1;}
 int vela_image_probe(const uint8_t*d,size_t n,VelaImageInfo*i){if(!d)return 0;if(probe_bmp(d,n,i))return 1;return probe_ppm(d,n,i,0);}
-int vela_image_decode_rgb24(const uint8_t*d,size_t n,uint8_t*rgb,size_t cap,VelaImageInfo*i){
-    if(!d||!rgb)return 0;VelaImageInfo info;
-    if(probe_bmp(d,n,&info)){
-        size_t need=(size_t)info.width*(size_t)info.height*3u;if(need>cap)return 0;uint32_t off=le32(d+10);uint16_t bpp=le16(d+28);int32_t sh=les32(d+22);size_t src_bpp=(size_t)bpp/8u;size_t row=((size_t)info.width*src_bpp+3u)&~3u;if(off>n||row>(n-off)/info.height)return 0;for(uint32_t y=0;y<info.height;y++){uint32_t sy=sh>0?info.height-1u-y:y;const uint8_t*s=d+off+(size_t)sy*row;uint8_t*o=rgb+(size_t)y*info.width*3u;for(uint32_t x=0;x<info.width;x++){o[x*3u+0]=s[x*src_bpp+2];o[x*3u+1]=s[x*src_bpp+1];o[x*3u+2]=s[x*src_bpp+0];}}if(i)*i=info;return 1;
-    }
-    size_t p;if(probe_ppm(d,n,&info,&p)){size_t need=(size_t)info.width*(size_t)info.height*3u;if(need>cap)return 0;for(size_t k=0;k<need;k++)rgb[k]=d[p+k];if(i)*i=info;return 1;}
-    return 0;
-}
+int vela_image_decode_rgb24(const uint8_t*d,size_t n,uint8_t*rgb,size_t cap,VelaImageInfo*i){if(!d||!rgb)return 0;VelaImageInfo info;if(probe_bmp(d,n,&info)){size_t pixels=(size_t)info.width*(size_t)info.height,need=pixels*3u;if(need>cap)return 0;uint32_t off=le32(d+10);uint16_t bpp=le16(d+28);int32_t sh=les32(d+22);size_t src_bpp=(size_t)bpp/8u;size_t row=((size_t)info.width*src_bpp+3u)&~3u;if(off>n||row>(n-off)/info.height)return 0;for(uint32_t y=0;y<info.height;y++){uint32_t sy=sh>0?info.height-1u-y:y;const uint8_t*s=d+off+(size_t)sy*row;uint8_t*o=rgb+(size_t)y*info.width*3u;for(uint32_t x=0;x<info.width;x++){o[x*3u+0]=s[x*src_bpp+2];o[x*3u+1]=s[x*src_bpp+1];o[x*3u+2]=s[x*src_bpp+0];}}if(i)*i=info;return 1;}size_t p;if(probe_ppm(d,n,&info,&p)){size_t need=(size_t)info.width*(size_t)info.height*3u;if(need>cap)return 0;for(size_t k=0;k<need;k++)rgb[k]=d[p+k];if(i)*i=info;return 1;}return 0;}
