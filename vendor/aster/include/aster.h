@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define ASTER_VERSION "0.3.0"
+#define ASTER_VERSION "0.3.1"
 #define ASTER_API_MAJOR 1u
-#define ASTER_API_MINOR 2u
+#define ASTER_API_MINOR 3u
 #define ASTER_API_VERSION ((ASTER_API_MAJOR << 16) | ASTER_API_MINOR)
 #define ASTER_MAX_NODES 384
 #define ASTER_MAX_PAINT 512
@@ -39,12 +39,17 @@ typedef struct {
     uint8_t type,tag;
     int16_t parent,first_child,next_sibling;
     uint16_t text_off,text_len,href_off,href_len,src_off,src_len;
+    uint16_t id_off,id_len,class_off,class_len;
     uint16_t width_hint,height_hint;
     uint8_t style_flags,style_scale;
     uint32_t style_color;
 } AsterNode;
 
-typedef struct { uint8_t tag,flags,scale,color_set; uint32_t color; } AsterCssRule;
+typedef struct {
+    uint8_t tag,selector_kind,flags,scale,color_set;
+    uint16_t selector_off,selector_len;
+    uint32_t color;
+} AsterCssRule;
 
 typedef struct {
     int16_t x,y,w,h;
