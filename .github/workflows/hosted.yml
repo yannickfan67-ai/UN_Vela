@@ -1,0 +1,18 @@
+name: hosted-os
+on: [push, pull_request]
+
+jobs:
+  hosted:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure hosted carrier
+        run: cmake -S . -B build-hosted -DCMAKE_BUILD_TYPE=Release
+      - name: Build hosted carrier
+        run: cmake --build build-hosted --config Release
+      - name: Run hosted carrier smoke test
+        run: ctest --test-dir build-hosted -C Release --output-on-failure
