@@ -1,0 +1,36 @@
+name: nav-action-patch
+on:
+  push:
+    branches: [feat/navigation-actions-0.3.2-20260909]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[nav-action-patch-applied]') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/navigation-actions-0.3.2-20260909
+      - name: Apply navigation action patch
+        run: python3 tools/patch_nav_actions.py
+      - name: Portable compile matrix
+        run: make check-all
+      - name: Run core navigation smoke
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -Iinclude -Ivendor/aster/include src/vela.c tests/core_smoke.c -o build/core-smoke
+          ./build/core-smoke
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/vela.c tests/core_smoke.c
+          if git diff --cached --quiet; then
+            echo "No patch changes needed"
+            exit 0
+          fi
+          git commit -m "vela: implement portable navigation actions [nav-action-patch-applied]"
+          git push origin HEAD:feat/navigation-actions-0.3.2-20260909
