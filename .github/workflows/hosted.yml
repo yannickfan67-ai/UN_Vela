@@ -10,9 +10,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install libcurl development files
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
       - name: Configure hosted carrier
         run: cmake -S . -B build-hosted -DCMAKE_BUILD_TYPE=Release
       - name: Build hosted carrier
         run: cmake --build build-hosted --config Release
-      - name: Run hosted carrier smoke test
+      - name: Run hosted carrier and browser runtime tests
         run: ctest --test-dir build-hosted -C Release --output-on-failure
